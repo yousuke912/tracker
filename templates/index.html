@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>作業トラッカー</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f5f4f0;color:#1a1a18;font-size:14px}
+header{background:#fff;border-bottom:0.5px solid #e0dfd6;padding:12px 24px;display:flex;align-items:center;justify-content:space-between}
+header h1{font-size:15px;font-weight:500}
+.badge-live{background:#eaf3de;color:#3b6d11;font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500}
+.current-bar{background:#fff;border-bottom:0.5px solid #e0dfd6;padding:8px 24px;display:flex;align-items:center;gap:12px;font-size:12px;color:#888}
+.current-app{font-weight:500;color:#1a1a18;font-size:13px}
+.current-screen{background:#e6f1fb;color:#185fa5;padding:2px 8px;border-radius:10px;font-size:11px}
+.current-cat{background:#eeedfe;color:#534ab7;padding:2px 8px;border-radius:10px;font-size:11px}
+main{max-width:1100px;margin:0 auto;padding:20px 24px}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:16px}
+.metric{background:#fff;border-radius:10px;padding:14px 16px;border:0.5px solid #e0dfd6}
+.metric-label{font-size:11px;color:#888;margin-bottom:4px}
+.metric-value{font-size:22px;font-weight:500}
+.metric-sub{font-size:11px;color:#aaa;margin-top:2px}
+.tab-bar{display:flex;gap:4px;margin-bottom:16px}
+.tab{padding:6px 14px;border-radius:8px;font-size:12px;font-weight:500;cursor:pointer;border:0.5px solid #e0dfd6;background:#fff;color:#888}
+.tab.active{background:#1a1a18;color:#fff;border-color:#1a1a18}
+.row2{display:grid;grid-template-columns:1.3fr 0.7fr;gap:14px;margin-bottom:14px}
+.card{background:#fff;border-radius:12px;border:0.5px solid #e0dfd6;padding:16px 18px}
+.card-title{font-size:11px;font-weight:500;color:#888;letter-spacing:0.04em;text-transform:uppercase;margin-bottom:14px}
+.bar-row{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.bar-label{font-size:12px;color:#555;width:90px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{flex:1;height:7px;background:#f0efe8;border-radius:4px;overflow:hidden}
+.bar-fill{height:100%;border-radius:4px;transition:width 0.4s ease}
+.bar-time{font-size:11px;color:#aaa;width:40px;text-align:right;flex-shrink:0}
+.tl-screen-label{font-size:11px;color:#888;margin-bottom:4px;margin-top:10px}
+.tl-hours{display:flex;justify-content:space-between;font-size:10px;color:#aaa;margin-bottom:3px;padding:0 1px}
+.tl-row{display:flex;gap:2px;height:22px}
+.tl-block{flex:1;border-radius:3px}
+.tl-legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:8px}
+.tl-legend-item{display:flex;align-items:center;gap:5px;font-size:11px;color:#888}
+.tl-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0}
+.focus-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:0.5px solid #f0efe8}
+.focus-row:last-child{border-bottom:none}
+.focus-icon{width:30px;height:30px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:15px}
+.focus-info{flex:1}
+.focus-name{font-size:13px}
+.focus-meta{font-size:11px;color:#aaa;margin-top:1px}
+.focus-score{font-size:14px;font-weight:500;min-width:30px;text-align:right}
+.score-hi{color:#3b6d11}.score-mid{color:#ba7517}.score-lo{color:#a32d2d}
+.screens-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.screen-card{background:#f5f4f0;border-radius:8px;padding:12px 14px}
+.screen-name{font-size:11px;color:#888;margin-bottom:4px}
+.screen-val{font-size:18px;font-weight:500}
+.screen-pct{font-size:11px;color:#aaa}
+</style>
+</head>
+<body>
+<header>
+  <h1>作業トラッカー</h1>
+  <span class="badge-live" id="liveBadge">● 読み込み中</span>
+</header>
+<div class="current-bar">
+  <span>現在：</span>
+  <span class="current-app" id="curApp">—</span>
+  <span class="current-screen" id="curScreen"></span>
+  <span class="current-cat" id="curCat"></span>
+  <span id="curTitle" style="color:#aaa;max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+</div>
+<main>
+  <div class="metrics">
+    <div class="metric"><div class="metric-label">総作業時間</div><div class="metric-value" id="mTotal">—</div></div>
+    <div class="metric"><div class="metric-label">集中ブロック</div><div class="metric-value" id="mFocusCnt">—</div><div class="metric-sub" id="mMaxFocus"></div></div>
+    <div class="metric"><div class="metric-label">切り替え回数</div><div class="metric-value" id="mSwitches">—</div></div>
+    <div class="metric"><div class="metric-label">スクリーン使用</div><div class="metric-value" id="mScreens">—</div><div class="metric-sub" id="mScreensSub"></div></div>
+  </div>
+  <div class="tab-bar" id="tabBar">
+    <div class="tab active" onclick="setScreen('all',this)">全画面</div>
+  </div>
+  <div class="card" style="margin-bottom:14px;">
+    <div class="card-title">時間帯別アクティビティ</div>
+    <div id="timelineWrap"></div>
+    <div class="tl-legend">
+      <div class="tl-legend-item"><div class="tl-dot" style="background:#378add;"></div>コーディング</div>
+      <div class="tl-legend-item"><div class="tl-dot" style="background:#1d9e75;"></div>執筆</div>
+      <div class="tl-legend-item"><div class="tl-dot" style="background:#ba7517;"></div>会議・通話</div>
+      <div class="tl-legend-item"><div class="tl-dot" style="background:#7f77dd;"></div>設計・思考</div>
+      <div class="tl-legend-item"><div class="tl-dot" style="background:#888;"></div>調査</div>
+      <div class="tl-legend-item"><div class="tl-dot" style="background:#d4537e;"></div>SNS・雑多</div>
+      <div class="tl-legend-item"><div class="tl-dot" style="background:#e0dfd6;border:0.5px solid #ccc;"></div>不在</div>
+    </div>
+  </div>
+  <div class="row2">
+    <div class="card"><div class="card-title">アプリ使用時間</div><div id="appBars"></div></div>
+    <div class="card">
+      <div class="card-title">タスク種別</div>
+      <div style="position:relative;height:160px;"><canvas id="donutChart" role="img" aria-label="タスク種別の割合"></canvas></div>
+      <div id="donutLegend" style="margin-top:10px;"></div>
+    </div>
+  </div>
+  <div class="row2">
+    <div class="card"><div class="card-title">集中ブロック（5分以上）</div><div id="focusList"></div></div>
+    <div class="card">
+      <div class="card-title">スクリーン別使用時間</div>
+      <div class="screens-grid" id="screensGrid"></div>
+      <div style="margin-top:14px;position:relative;height:120px;"><canvas id="screenChart" role="img" aria-label="スクリーン別使用時間"></canvas></div>
+    </div>
+  </div>
+</main>
+<script>
+const CAT_COLORS={"コーディング":"#378add","執筆":"#1d9e75","会議・通話":"#ba7517","設計・思考":"#7f77dd","調査・リサーチ":"#888780","SNS・雑多":"#d4537e","管理・事務":"#5dcaa5","不明":"#ccc"};
+const SCREEN_COLORS=["#378add","#1d9e75","#ba7517","#7f77dd","#d4537e","#888"];
+let currentScreen="all",allData=null,donutChart=null,screenChart=null;
+
+function setScreen(s,el){
+  currentScreen=s;
+  document.querySelectorAll(".tab").forEach(t=>t.classList.remove("active"));
+  el.classList.add("active");
+  if(allData)renderData(allData);
+}
+
+async function fetchCurrent(){
+  try{
+    const d=await(await fetch("/api/current")).json();
+    if(d.app_name){
+      document.getElementById("curApp").textContent=d.app_name;
+      document.getElementById("curScreen").textContent=d.screen_label||"";
+      document.getElementById("curCat").textContent=d.task_category||"";
+      document.getElementById("curTitle").textContent=d.window_title||"";
+      document.getElementById("liveBadge").textContent="● ライブ";
+    }
+  }catch(e){}
+}
+
+async function fetchSummary(){
+  try{
+    allData=await(await fetch("/api/summary")).json();
+    renderData(allData);
+    const tabBar=document.getElementById("tabBar");
+    const existing=new Set(["all"]);
+    (allData.screens||[]).forEach(s=>{
+      if(!existing.has(s.label)){
+        existing.add(s.label);
+        const t=document.createElement("div");
+        t.className="tab";
+        t.textContent=s.label==="main"?"メイン画面":`サブ画面${s.label.replace("sub","")}`;
+        t.onclick=()=>setScreen(s.label,t);
+        tabBar.appendChild(t);
+      }
+    });
+  }catch(e){console.error(e);}
+}
+
+function renderData(data){
+  const s=data.summary;
+  document.getElementById("mTotal").textContent=s.total_work_hm||"0m";
+  document.getElementById("mSwitches").textContent=s.switches||0;
+  document.getElementById("mFocusCnt").textContent=(s.focus_count||0)+"回";
+  document.getElementById("mMaxFocus").textContent="最長 "+(s.max_focus_hm||"—");
+  const screens=data.screens||[];
+  if(screens.length){
+    document.getElementById("mScreens").textContent=screens.length+"画面";
+    document.getElementById("mScreensSub").textContent=screens.map(s=>`${s.label}: ${s.hm}`).join(" / ");
+  }
+
+  let apps=data.apps||[];
+  if(currentScreen!=="all")apps=apps.filter(a=>a.screen===currentScreen);
+  const appEl=document.getElementById("appBars");
+  appEl.innerHTML="";
+  const maxSec=apps.length?apps[0].seconds:1;
+  apps.slice(0,8).forEach(a=>{
+    const pct=Math.round(a.seconds/maxSec*100);
+    const color=CAT_COLORS[a.category]||"#888";
+    const tag=(currentScreen==="all"&&a.screen!=="main")?`<span style="font-size:10px;color:#185fa5;background:#e6f1fb;padding:1px 5px;border-radius:8px;margin-left:2px;">${a.screen}</span>`:"";
+    appEl.innerHTML+=`<div class="bar-row"><div class="bar-label">${a.app}${tag}</div><div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color};"></div></div><div class="bar-time">${a.hm}</div></div>`;
+  });
+
+  const tlWrap=document.getElementById("timelineWrap");
+  tlWrap.innerHTML="";
+  const hourly=data.hourly||{};
+  const hours=Array.from({length:13},(_,i)=>String(i+9).padStart(2,"0"));
+  const screenLabels=currentScreen==="all"?[...new Set((data.screens||[]).map(s=>s.label))]:[currentScreen];
+  screenLabels.forEach(sl=>{
+    if(screenLabels.length>1){
+      const lbl=document.createElement("div");
+      lbl.className="tl-screen-label";
+      lbl.textContent=sl==="main"?"メイン画面":`サブ画面${sl.replace("sub","")}`;
+      tlWrap.appendChild(lbl);
+    }
+    const hoursEl=document.createElement("div");
+    hoursEl.className="tl-hours";
+    hours.forEach(h=>{hoursEl.innerHTML+=`<span>${parseInt(h)}</span>`;});
+    tlWrap.appendChild(hoursEl);
+    const row=document.createElement("div");
+    row.className="tl-row";
+    hours.forEach(h=>{
+      const slotData=hourly[h]||{};
+      let best=null,bestSec=0;
+      Object.entries(slotData).forEach(([key,sec])=>{
+        const [screen,cat]=key.split(":");
+        if(screen===sl&&sec>bestSec){bestSec=sec;best=cat;}
+      });
+      const color=best?(CAT_COLORS[best]||"#ccc"):"#e0dfd6";
+      const b=document.createElement("div");
+      b.className="tl-block";
+      b.style.background=color;
+      b.title=best?`${h}時: ${best}`:`${h}時: 不在`;
+      row.appendChild(b);
+    });
+    tlWrap.appendChild(row);
+  });
+
+  let cats=data.categories||[];
+  if(donutChart)donutChart.destroy();
+  donutChart=new Chart(document.getElementById("donutChart"),{
+    type:"doughnut",
+    data:{labels:cats.map(c=>c.name),datasets:[{data:cats.map(c=>c.seconds),backgroundColor:cats.map(c=>CAT_COLORS[c.name]||"#ccc"),borderWidth:0}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}
+  });
+  document.getElementById("donutLegend").innerHTML=cats.map((c,i)=>
+    `<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:#888;margin-bottom:4px;">
+      <div style="width:8px;height:8px;border-radius:2px;background:${CAT_COLORS[c.name]||"#ccc"};flex-shrink:0;"></div>
+      ${c.name}<span style="margin-left:auto;color:#1a1a18;font-weight:500;">${c.pct}%</span>
+    </div>`
+  ).join("");
+
+  const fl=document.getElementById("focusList");
+  fl.innerHTML="";
+  const icons={"コーディング":"💻","執筆":"✍️","会議・通話":"📞","設計・思考":"🎨","調査・リサーチ":"🔍","SNS・雑多":"📱","管理・事務":"📋"};
+  const blocks=(data.focus_blocks||[]).slice(0,6);
+  if(!blocks.length){fl.innerHTML=`<div style="color:#aaa;font-size:12px;padding:8px 0;">まだデータがありません（5分以上の集中セッションで表示）</div>`;}
+  blocks.forEach(f=>{
+    const sc=f.score>=70?"score-hi":f.score>=45?"score-mid":"score-lo";
+    const bg=(CAT_COLORS[f.category]||"#888")+"22";
+    fl.innerHTML+=`<div class="focus-row"><div class="focus-icon" style="background:${bg};">${icons[f.category]||"📌"}</div><div class="focus-info"><div class="focus-name">${f.app}</div><div class="focus-meta">${f.start}〜${f.end} · ${f.hm} · ${f.category}</div></div><div class="focus-score ${sc}">${f.score}</div></div>`;
+  });
+
+  document.getElementById("screensGrid").innerHTML=(data.screens||[]).map(s=>
+    `<div class="screen-card"><div class="screen-name">${s.label==="main"?"メイン画面":"サブ画面"}</div><div class="screen-val">${s.hm}</div><div class="screen-pct">${s.pct}%</div></div>`
+  ).join("");
+
+  if(screenChart)screenChart.destroy();
+  screenChart=new Chart(document.getElementById("screenChart"),{
+    type:"bar",
+    data:{
+      labels:(data.screens||[]).map(s=>s.label==="main"?"メイン":"サブ"),
+      datasets:[{data:(data.screens||[]).map(s=>Math.round(s.seconds/60)),backgroundColor:SCREEN_COLORS,borderWidth:0,borderRadius:4}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{y:{ticks:{callback:v=>v+"分"},grid:{color:"#f0efe8"}},x:{grid:{display:false}}}}
+  });
+}
+
+fetchSummary();
+fetchCurrent();
+setInterval(fetchCurrent,3000);
+setInterval(fetchSummary,30000);
+</script>
+</body>
+</html>
